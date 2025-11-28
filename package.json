@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "tauri:init": "tauri init --ci",
     "tauri:dev": "cross-env BROWSER=NONE tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "build:all": "npm run build && npm run tauri:build",
+    "icons:gen": "powershell -ExecutionPolicy Bypass -File scripts\\generate-icons.ps1 || sh scripts/generate-icons.sh"
   },
   "scripts-shell": {
     "icons:gen:ps": "powershell -ExecutionPolicy Bypass -File scripts\\generate-icons.ps1",
@@ -19,6 +21,8 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/vite": "^4.1.17",
+    "@tauri-apps/plugin-dialog": "^2.4.2",
+    "@tauri-apps/plugin-fs": "^2.4.4",
     "@types/uuid": "^10.0.0",
     "clsx": "^2.1.1",
     "file-saver": "^2.0.5",

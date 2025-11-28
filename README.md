@@ -1,129 +1,141 @@
-# React + TypeScript + Vite
+# LED Matrix Studio
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**Éditeur d'animations pour matrice LED 16×16** — Application desktop (Tauri) et web (Vite).
 
-Currently, two official plugins are available:
+![Logo](src/assets/logo.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+##  Fonctionnalités
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Dessin pixel par pixel sur grille 16×16
+- Timeline avec gestion des frames (ajout, duplication, suppression, réorganisation)
+- Formes prédéfinies (cercle, carré, cœur, flèches, etc.) utilisables comme pinceau
+- Transformations : rotation, miroir, décalage cyclique
+- Simulation de clignotement LED
+- Export binaire pour 4 EEPROMs (quadrants TL, TR, BL, BR)
+- Sauvegarde/chargement de projets JSON
+- Raccourcis clavier (Ctrl+Z/Y pour Undo/Redo, Ctrl+S pour sauvegarder)
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+##  Installation & Lancement
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    # LED Matrix Studio — Tauri build notes
+### Prérequis
 
-    This repository is a React + TypeScript + Vite application that can be built as a desktop app using Tauri.
+- **Node.js** ≥ 18
+- **Rust** (pour Tauri) — installer via [rustup.rs](https://rustup.rs/)
+- **Tauri CLI** : `npm install -g @tauri-apps/cli` (ou utiliser via npx)
 
-    Quick start (dev):
+### Installation des dépendances
 
-    1. Install Node.js (>=18), Rust toolchain and Tauri prerequisites:
+```bash
+npm install
+```
 
-    ```pwsh
-    # Windows (PowerShell)
-    choco install rust -y     # or via https://rustup.rs/
-    npm install -g @tauri-apps/cli
-    ```
+### Mode développement
 
-    2. Install dependencies and run in dev mode:
+**Version Web uniquement :**
+```bash
+npm run dev
+```
+Ouvre http://localhost:5173
 
-    ```pwsh
-    npm install
-    npm run dev        # opens Vite dev server
-    # In another terminal: npm run tauri:dev
-    ```
+**Version Desktop (Tauri) :**
+```bash
+npm run tauri:dev
+```
+Lance le serveur Vite + ouvre la fenêtre native Tauri.
 
-    Build for production:
+---
 
-    ```pwsh
-    npm run build
-    npm run tauri:build
-    ```
+##  Générer un exécutable / installateur
 
-    Notes:
-    - The project expects an icon at `src-tauri/icons/icon.png` (copied from `src/assets/logo.png`). For proper platform icons you may provide `icon.ico` (Windows) and `icon.icns` (macOS) inside `src-tauri/icons`.
-    - Tauri requires the Rust toolchain installed and cargo available on PATH.
+### Build Web (pour déploiement sur serveur)
 
-    If you want, I can generate basic icon files from the logo, but for production you should create proper `.ico` and `.icns` assets.
+```bash
+npm run build
+```
+Les fichiers statiques sont générés dans le dossier `dist/`.
 
-    ---
+### Build Desktop (Tauri)
 
-    **Guide complet du projet**
+```bash
+npm run tauri:build
+```
 
-    Description
-    - LED Matrix Studio : éditeur d'animations pour matrice LED 16×16. Permet de dessiner, gérer une timeline, appliquer formes, et exporter des binaires pour EEPROM (4 quadrants : TL, TR, BL, BR).
+**Où trouver l'exécutable / installateur :**
 
-    Fichiers importants
-    - `src/` : code React + TS
-    - `src/assets/logo.png` : logo de l'application (utilisé comme icône)
-    - `src/assets/MONTAGE.png` : capture du schéma matériel (inclus ci-dessous)
-    - `src-tauri/tauri.conf.json` : configuration Tauri
+| Plateforme | Chemin |
+|------------|--------|
+| Windows (.exe, .msi) | `src-tauri/target/release/bundle/msi/` et `src-tauri/target/release/bundle/nsis/` |
+| macOS (.app, .dmg) | `src-tauri/target/release/bundle/macos/` et `src-tauri/target/release/bundle/dmg/` |
+| Linux (.deb, .AppImage) | `src-tauri/target/release/bundle/deb/` et `src-tauri/target/release/bundle/appimage/` |
 
-    Capture d'écran du schéma (dossier `src/assets`):
+L'exécutable standalone se trouve dans `src-tauri/target/release/led-matrix-studio.exe` (Windows).
 
-    ![Schéma matériel](src/assets/MONTAGE.png)
+---
 
-    Génération d'icônes (conseils)
-    - Pour Windows (ICO) avec ImageMagick :
+## Icônes
 
-    ```pwsh
-    # Installez ImageMagick (https://imagemagick.org)
-    magick convert src/assets/logo.png -resize 256x256 src-tauri/icons/icon-256.png
-    magick convert src/assets/logo.png -resize 48x48 src-tauri/icons/icon-48.png
-    magick convert src/assets/logo.png -resize 32x32 src-tauri/icons/icon-32.png
-    # Puis créez l'ICO (Windows) :
-    magick convert src-tauri/icons/icon-256.png src-tauri/icons/icon-48.png src-tauri/icons/icon-32.png src-tauri/icons/icon.ico
-    ```
+Les icônes de l'application sont dans `src-tauri/icons/` :
+- `icon.png` — icône principale (PNG)
+- `icon.ico` — icône Windows
 
-    - Pour macOS (ICNS) :
+Pour regénérer les icônes depuis le logo (nécessite ImageMagick) :
 
-    ```bash
-    # Créez un dossier .iconset avec les tailles requises
-    mkdir -p tmp.iconset
-    magick convert src/assets/logo.png -resize 16x16 tmp.iconset/icon_16x16.png
-    magick convert src/assets/logo.png -resize 32x32 tmp.iconset/icon_16x16@2x.png
-    magick convert src/assets/logo.png -resize 32x32 tmp.iconset/icon_32x32.png
-    magick convert src/assets/logo.png -resize 64x64 tmp.iconset/icon_32x32@2x.png
-    magick convert src/assets/logo.png -resize 128x128 tmp.iconset/icon_128x128.png
-    magick convert src/assets/logo.png -resize 256x256 tmp.iconset/icon_128x128@2x.png
-    magick convert src/assets/logo.png -resize 256x256 tmp.iconset/icon_256x256.png
-    magick convert src/assets/logo.png -resize 512x512 tmp.iconset/icon_256x256@2x.png
-    iconutil -c icns tmp.iconset -o src-tauri/icons/icon.icns
-    rm -r tmp.iconset
-    ```
+```powershell
+# Windows PowerShell
+magick convert src/assets/logo.png -resize 256x256 src-tauri/icons/icon.png
+magick convert src/assets/logo.png -resize 256x256 src-tauri/icons/icon-256.png
+magick convert src/assets/logo.png -resize 32x32 src-tauri/icons/icon-32.png
+magick convert src-tauri/icons/icon-256.png src-tauri/icons/icon-32.png src-tauri/icons/icon.ico
+```
 
-    Packaging & build
-    - Build web :
+---
 
-    ```pwsh
-    npm install
-    npm run build
-    ```
+##  Structure du projet
 
-    - Build Tauri :
+```
+led-matrix-studio/
+├── src/                    # Code React + TypeScript
+│   ├── assets/             # Logo, schémas
+│   ├── components/         # Composants UI
+│   ├── core/               # Logique métier (export binaire, types)
+│   └── store/              # État global (Zustand)
+├── src-tauri/              # Backend Tauri (Rust)
+│   ├── icons/              # Icônes de l'application
+│   ├── src/main.rs         # Point d'entrée Rust
+│   ├── Cargo.toml          # Dépendances Rust
+│   └── tauri.conf.json     # Configuration Tauri
+├── dist/                   # Build web (généré)
+└── package.json            # Scripts npm
+```
 
-    ```pwsh
-    # Assurez-vous d'avoir Rust, cargo et tauri-cli installés
-    npm run tauri:build
-    ```
+---
 
-    Debug & dev
-    - Dev web (vite) : `npm run dev`
-    - Dev desktop (Tauri) : `npm run tauri:dev` (ouvre la fenêtre native pointant sur le dev server)
+##  Scripts npm disponibles
 
-    Support & notes
-    - Le dossier `src-tauri/icons` contient `icon.png` (copie du logo). Pour des releases propres, générez `icon.ico` et `icon.icns` comme indiqué ci‑dessus.
+| Commande | Description |
+|----------|-------------|
+| `npm run dev` | Serveur de développement Vite (web) |
+| `npm run build` | Build de production (web) |
+| `npm run preview` | Prévisualiser le build web |
+| `npm run tauri:dev` | Lancer l'app desktop en mode dev |
+| `npm run tauri:build` | Générer l'installateur/exécutable desktop |
 
-    Besoin d'aide ? Dites-moi si vous voulez que je :
-    - génère automatiquement des PNG à plusieurs tailles ici (nécessite ImageMagick local),
-    - prépare un script pour automatiser la création des icônes,
-    - ou que je rédige des instructions plus détaillées pour la CI (GitHub Actions) afin d'automatiser les builds Tauri.
-    files: ['**/*.{ts,tsx}'],
+![Screenshot home](src/assets/screenshot-home.png)
+![Screenshot studio](src/assets/screenshot-studio.png)
+---
+
+## Schéma matériel
+
+Le projet est conçu pour piloter une matrice LED 16×16 via 4 EEPROMs (un par quadrant 8×8).
+
+![Schéma du montage](src/assets/MONTAGE.png)
+
+---
+
+##  Licence
+
+MIT — Tiger-Foxx © 2025

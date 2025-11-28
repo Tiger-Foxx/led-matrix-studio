@@ -1,6 +1,5 @@
-import { saveAs } from 'file-saver';
-import JSZip from 'jszip';
 import type { ExportConfig, Frame, Matrix16x16 } from './types';
+import { isTauri, saveBinaryFilesToFolder } from '../utils/tauri-export';
 
 /**
  * Binary Export - Reproduit EXACTEMENT la logique du code Python de preuve de concept
@@ -179,16 +178,16 @@ export const generateBinaryFiles = async (
     // Nettoyer le nom du projet pour les noms de fichiers
     const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-    // Créer le ZIP avec les fichiers binaires préfixés du nom du projet
-    const zip = new JSZip();
-    zip.file(`${safeName}_TL.bin`, new Uint8Array(dataTL));
-    zip.file(`${safeName}_TR.bin`, new Uint8Array(dataTR));
-    zip.file(`${safeName}_BL.bin`, new Uint8Array(dataBL));
-    zip.file(`${safeName}_BR.bin`, new Uint8Array(dataBR));
+    // Préparer les fichiers à sauvegarder
+    const files = [
+        { filename: `${safeName}_TL.bin`, data: new Uint8Array(dataTL) },
+        { filename: `${safeName}_TR.bin`, data: new Uint8Array(dataTR) },
+        { filename: `${safeName}_BL.bin`, data: new Uint8Array(dataBL) },
+        { filename: `${safeName}_BR.bin`, data: new Uint8Array(dataBR) },
+    ];
 
-    // Télécharger le ZIP
-    const content = await zip.generateAsync({ type: 'blob' });
-    saveAs(content, `${safeName}_binaries.zip`);
+    // Sauvegarder les fichiers (dialogue natif en Tauri, ZIP en web)
+    await saveBinaryFilesToFolder(files, `${safeName}_binaries`);
     
     // Log pour debug
     console.log('=== Export Debug ===');

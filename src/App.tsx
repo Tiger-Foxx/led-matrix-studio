@@ -10,7 +10,7 @@ import { ControlPanel } from './components/ControlPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { ShapesPanel } from './components/ShapesPanel';
 import { useStore } from './store/useStore';
-import { saveAs } from 'file-saver';
+import { saveTextFile } from './utils/tauri-export';
 
 function App() {
     const { 
@@ -96,10 +96,10 @@ function App() {
         }
     };
 
-    const handleExportJson = () => {
+    const handleExportJson = async () => {
         const json = exportProjectAsJson();
-        const blob = new Blob([json], { type: 'application/json' });
-        saveAs(blob, `${currentProject?.name || 'project'}.json`);
+        const filename = `${currentProject?.name || 'project'}.json`;
+        await saveTextFile(json, filename, [{ name: 'Fichiers JSON', extensions: ['json'] }]);
     };
 
     const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
