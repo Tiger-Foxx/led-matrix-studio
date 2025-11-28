@@ -206,7 +206,7 @@ export const Timeline: React.FC = () => {
                         </div>
                         
                         {/* Frame number */}
-                        <div className={`text-center text-xs mt-1 ${index === currentFrameIndex ? 'text-[#00ff41]' : 'text-gray-500'}`}>
+                        <div className={`text-center text-xs mt-4 ${index === currentFrameIndex ? 'text-[#00ff41]' : 'text-gray-500'}`}>
                             {index + 1}
                         </div>
                     </div>

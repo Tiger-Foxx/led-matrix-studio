@@ -1,0 +1,25 @@
+{
+  "package": {
+    "productName": "LED Matrix Studio",
+    "version": "0.0.0"
+  },
+  "build": {
+    "beforeBuildCommand": "npm run build",
+    "beforeDevCommand": "npm run dev",
+    "devPath": "http://localhost:5173",
+    "distDir": "../dist"
+  },
+  "tauri": {
+    "bundle": {
+      "identifier": "com.tiger-foxx.ledmatrix",
+      "icon": [
+        "icons/icon.png",
+        "icons/icon.ico",
+        "icons/icon.icns"
+      ]
+    },
+    "security": {
+      "csp": null
+    }
+  }
+}
