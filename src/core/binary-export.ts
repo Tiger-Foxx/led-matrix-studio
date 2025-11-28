@@ -1,5 +1,5 @@
 import type { ExportConfig, Frame, Matrix16x16 } from './types';
-import { isTauri, saveBinaryFilesToFolder } from '../utils/tauri-export';
+import { saveBinaryFilesToFolder } from '../utils/tauri-export';
 
 /**
  * Binary Export - Reproduit EXACTEMENT la logique du code Python de preuve de concept
