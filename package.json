@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "tauri": "tauri",
     "tauri:init": "tauri init --ci",
     "tauri:dev": "cross-env BROWSER=NONE tauri dev",
     "tauri:build": "tauri build",
