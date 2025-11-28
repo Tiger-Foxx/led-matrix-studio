@@ -170,7 +170,7 @@ export const generateShape = (shape: string): Matrix16x16 => {
 
 const DEFAULT_CONFIG: ExportConfig = {
     bitReversal: true,
-    flipX: false,
+    flipX: true,          // Activé par défaut pour correspondre au hardware
     flipY: false,
     invertOutput: true,
     offsetY: -1,

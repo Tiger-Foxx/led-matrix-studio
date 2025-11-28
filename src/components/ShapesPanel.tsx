@@ -35,7 +35,7 @@ export function ShapesPanel() {
     const hasFrame = currentProject && currentProject.frames.length > 0;
 
     return (
-        <aside className="w-56 bg-[#111] border-r border-[#333] flex flex-col overflow-hidden">
+        <aside className="w-56 bg-[#111] border-r border-[#333] flex flex-col overflow-y-auto scrollbar-thin">
             {/* Shapes Section */}
             <div className="p-4 border-b border-[#333]">
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">

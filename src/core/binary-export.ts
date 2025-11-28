@@ -189,4 +189,14 @@ export const generateBinaryFiles = async (
     // Télécharger le ZIP
     const content = await zip.generateAsync({ type: 'blob' });
     saveAs(content, `${safeName}_binaries.zip`);
+    
+    // Log pour debug
+    console.log('=== Export Debug ===');
+    console.log('Project:', projectName);
+    console.log('Frames:', frames.length);
+    console.log('Config:', config);
+    console.log('First frame top-left corner (0,0):', frames[0]?.grid[0][0]);
+    console.log('First frame top-right corner (0,15):', frames[0]?.grid[0][15]);
+    console.log('TL first 8 bytes:', dataTL.slice(0, 8).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    console.log('TR first 8 bytes:', dataTR.slice(0, 8).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
 };
