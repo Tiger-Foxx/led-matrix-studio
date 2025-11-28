@@ -35,17 +35,37 @@ body {
   scrollbar-color: #333 transparent;
 }
 .scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
   background: #333;
-  border-radius: 3px;
+  border-radius: 2px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+/* Very thin scrollbar for main content */
+.scrollbar-minimal {
+  scrollbar-width: thin;
+  scrollbar-color: #222 transparent;
+}
+.scrollbar-minimal::-webkit-scrollbar {
+  width: 3px;
+  height: 3px;
+}
+.scrollbar-minimal::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-minimal::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 2px;
+}
+.scrollbar-minimal::-webkit-scrollbar-thumb:hover {
   background: #444;
 }
 

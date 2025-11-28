@@ -28,7 +28,8 @@ function App() {
         importProjectFromJson,
         undo,
         redo,
-        toastMessage
+        toastMessage,
+        showToast
     } = useStore();
 
     const [showExport, setShowExport] = useState(false);
@@ -97,9 +98,21 @@ function App() {
     };
 
     const handleExportJson = async () => {
-        const json = exportProjectAsJson();
-        const filename = `${currentProject?.name || 'project'}.json`;
-        await saveTextFile(json, filename, [{ name: 'Fichiers JSON', extensions: ['json'] }]);
+        try {
+            console.log('[handleExportJson] Début export JSON');
+            const json = exportProjectAsJson();
+            console.log('[handleExportJson] JSON généré, longueur:', json.length);
+            const filename = `${currentProject?.name || 'project'}.json`;
+            console.log('[handleExportJson] Nom fichier:', filename);
+            const success = await saveTextFile(json, filename, [{ name: 'Fichiers JSON', extensions: ['json'] }]);
+            console.log('[handleExportJson] Export terminé, success:', success);
+            if (success) {
+                showToast('Projet JSON exporté !');
+            }
+        } catch (error) {
+            console.error('[handleExportJson] Erreur:', error);
+            showToast('Erreur lors de l\'export');
+        }
     };
 
     const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,14 +286,14 @@ function App() {
             )}
 
             {/* Header */}
-            <header className="flex items-center justify-between px-4 py-3 border-b border-[#333] bg-[#111] flex-shrink-0">
-                <div className="flex items-center gap-4">
+            <header className="flex items-center justify-between px-2 sm:px-4 py-2 sm:py-3 border-b border-[#333] bg-[#111] flex-shrink-0">
+                <div className="flex items-center gap-2 sm:gap-4">
                     <div className="flex items-center gap-2">
-                        <img src={logo} alt="Logo" className="w-8 h-8" />
-                        <span className="font-bold text-white">LED Matrix Studio</span>
+                        <img src={logo} alt="Logo" className="w-6 h-6 sm:w-8 sm:h-8" />
+                        <span className="font-bold text-white text-sm sm:text-base hidden sm:inline">LED Matrix Studio</span>
                     </div>
                     
-                    <div className="h-5 w-px bg-[#333]"></div>
+                    <div className="h-5 w-px bg-[#333] hidden sm:block"></div>
                     
                     {/* Project Name */}
                     {isEditingName ? (
@@ -290,7 +303,7 @@ function App() {
                                 value={editedName}
                                 onChange={(e) => setEditedName(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && handleRename()}
-                                className="bg-[#222] border border-[#444] rounded px-2 py-1 text-white text-sm w-48"
+                                className="bg-[#222] border border-[#444] rounded px-2 py-1 text-white text-sm w-32 sm:w-48"
                                 autoFocus
                             />
                             <button onClick={handleRename} className="text-[#00ff41] hover:text-white">
@@ -308,60 +321,64 @@ function App() {
                             }}
                             className="flex items-center gap-2 text-gray-300 hover:text-white"
                         >
-                            <span>{currentProject.name}</span>
+                            <span className="text-sm sm:text-base truncate max-w-[100px] sm:max-w-none">{currentProject.name}</span>
                             <Edit3 size={14} className="text-gray-500" />
                         </button>
                     )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <button onClick={undo} className="btn" title="Annuler (Ctrl+Z)">
-                        <Undo size={16} />
+                <div className="flex items-center gap-1 sm:gap-2">
+                    <button onClick={undo} className="btn p-1.5 sm:p-2" title="Annuler (Ctrl+Z)">
+                        <Undo size={14} className="sm:w-4 sm:h-4" />
                     </button>
-                    <button onClick={redo} className="btn" title="Rétablir (Ctrl+Y)">
-                        <Redo size={16} />
+                    <button onClick={redo} className="btn p-1.5 sm:p-2" title="Rétablir (Ctrl+Y)">
+                        <Redo size={14} className="sm:w-4 sm:h-4" />
                     </button>
-                    <div className="w-px h-5 bg-[#333] mx-1"></div>
+                    <div className="w-px h-5 bg-[#333] mx-0.5 sm:mx-1 hidden sm:block"></div>
                     <button 
                         onClick={() => setShowRecentProjects(true)} 
-                        className="btn" 
+                        className="btn p-1.5 sm:p-2" 
                         title="Projets"
                     >
-                        <FolderOpen size={16} />
+                        <FolderOpen size={14} className="sm:w-4 sm:h-4" />
                     </button>
                     <button 
                         onClick={() => saveCurrentProject()} 
-                        className="btn" 
+                        className="btn p-1.5 sm:p-2" 
                         title="Sauvegarder (Ctrl+S)"
                     >
-                        <Save size={16} />
+                        <Save size={14} className="sm:w-4 sm:h-4" />
                     </button>
                     <button 
                         onClick={handleExportJson} 
-                        className="btn" 
+                        className="btn p-1.5 sm:p-2" 
                         title="Exporter JSON"
                     >
-                        <FileJson size={16} />
+                        <FileJson size={14} className="sm:w-4 sm:h-4" />
                     </button>
                     <button 
-                        className="btn btn-primary flex items-center gap-2"
+                        className="btn btn-primary flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2"
                         onClick={() => setShowExport(true)}
                     >
-                        <Download size={16} />
-                        <span>Exporter Binaires</span>
+                        <Download size={14} className="sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline text-sm">Exporter Binaires</span>
                     </button>
                 </div>
             </header>
 
             {/* Main Content */}
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden min-h-0">
                 {/* Left Panel - Shapes */}
                 <ShapesPanel />
 
                 {/* Center - Matrix & Controls */}
-                <main className="flex-1 flex flex-col items-center justify-center p-6 gap-4 overflow-auto">
-                    <MatrixGrid />
-                    <ControlPanel />
+                <main className="flex-1 flex flex-col items-center justify-center p-2 sm:p-3 lg:p-4 gap-2 sm:gap-3 overflow-auto scrollbar-minimal min-h-0">
+                    <div className="flex-shrink-0">
+                        <MatrixGrid />
+                    </div>
+                    <div className="flex-shrink-0">
+                        <ControlPanel />
+                    </div>
                 </main>
             </div>
 

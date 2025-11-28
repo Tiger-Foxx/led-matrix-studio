@@ -8,15 +8,23 @@ interface ExportPanelProps {
 }
 
 export const ExportPanel: React.FC<ExportPanelProps> = ({ onClose }) => {
-    const { currentProject, updateExportConfig } = useStore();
+    const { currentProject, updateExportConfig, showToast } = useStore();
     
     if (!currentProject) return null;
     
     const { exportConfig, frames, name } = currentProject;
 
     const handleExport = async () => {
-        await generateBinaryFiles(frames, exportConfig, name);
-        onClose?.();
+        try {
+            const success = await generateBinaryFiles(frames, exportConfig, name);
+            if (success) {
+                showToast('Fichiers binaires exportés !');
+            }
+            onClose?.();
+        } catch (error) {
+            console.error('Erreur export binaire:', error);
+            showToast('Erreur lors de l\'export');
+        }
     };
 
     return (

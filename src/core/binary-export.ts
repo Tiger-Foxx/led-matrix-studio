@@ -126,13 +126,14 @@ const process8x8Block = (
  * @param frames - Les frames du projet
  * @param config - La configuration d'export
  * @param projectName - Le nom du projet (pour préfixer les fichiers)
+ * @returns true si l'export a réussi, false sinon
  */
 export const generateBinaryFiles = async (
     frames: Frame[], 
     config: ExportConfig,
     projectName: string = 'matrix_project'
-): Promise<void> => {
-    if (frames.length === 0) return;
+): Promise<boolean> => {
+    if (frames.length === 0) return false;
 
     const { loopSize } = config;
     const targetLoopSize = loopSize > 0 ? loopSize : 64;
@@ -187,7 +188,7 @@ export const generateBinaryFiles = async (
     ];
 
     // Sauvegarder les fichiers (dialogue natif en Tauri, ZIP en web)
-    await saveBinaryFilesToFolder(files, `${safeName}_binaries`);
+    const success = await saveBinaryFilesToFolder(files, `${safeName}_binaries`);
     
     // Log pour debug
     console.log('=== Export Debug ===');
@@ -198,4 +199,6 @@ export const generateBinaryFiles = async (
     console.log('First frame top-right corner (0,15):', frames[0]?.grid[0][15]);
     console.log('TL first 8 bytes:', dataTL.slice(0, 8).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
     console.log('TR first 8 bytes:', dataTR.slice(0, 8).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' '));
+    
+    return success;
 };

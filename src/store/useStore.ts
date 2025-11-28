@@ -52,6 +52,7 @@ interface AppState {
     redo: () => void;
     pushToHistory: () => void;
     clearToast: () => void;
+    showToast: (message: string) => void;
 
     // Frame Actions
     addFrame: () => void;
@@ -339,6 +340,11 @@ export const useStore = create<AppState>()(
             },
 
             clearToast: () => set({ toastMessage: null }),
+            
+            showToast: (message: string) => {
+                set({ toastMessage: message });
+                setTimeout(() => set({ toastMessage: null }), 2500);
+            },
 
             // === FRAME ACTIONS ===
             addFrame: () => {
