@@ -47,7 +47,7 @@ export const ControlPanel: React.FC = () => {
                 <input
                     type="range"
                     min="0"
-                    max="10"
+                    max="50"
                     step="1"
                     value={blinkFrequency}
                     onChange={(e) => setBlinkFrequency(Number(e.target.value))}

@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Play, Pause, Plus, Copy, Trash2, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Play, Pause, Plus, Copy, Trash2, GripVertical } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 export const Timeline: React.FC = () => {
@@ -16,8 +16,21 @@ export const Timeline: React.FC = () => {
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dropTarget, setDropTarget] = useState<number | null>(null);
     const [isResizing, setIsResizing] = useState(false);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; index: number } | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+    // Context Menu Handlers
+    const handleContextMenu = (e: React.MouseEvent, index: number) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, index });
+    };
+
+    useEffect(() => {
+        const handleClick = () => setContextMenu(null);
+        document.addEventListener('click', handleClick);
+        return () => document.removeEventListener('click', handleClick);
+    }, []);
 
     // Drag handlers for frames
     const handleDragStart = (e: React.DragEvent, index: number) => {
@@ -105,7 +118,7 @@ export const Timeline: React.FC = () => {
                     <span className="text-xs text-gray-500">Vitesse:</span>
                     <input
                         type="range"
-                        min="50"
+                        min="10"
                         max="1000"
                         step="10"
                         value={playbackSpeed}
@@ -119,11 +132,11 @@ export const Timeline: React.FC = () => {
                     <button onClick={addFrame} className="btn" title="Nouvelle frame">
                         <Plus size={16} />
                     </button>
-                    <button onClick={duplicateFrame} className="btn" title="Dupliquer">
+                    <button onClick={() => duplicateFrame()} className="btn" title="Dupliquer">
                         <Copy size={16} />
                     </button>
                     <button 
-                        onClick={deleteFrame} 
+                        onClick={() => deleteFrame()} 
                         className="btn hover:bg-red-600/20 hover:border-red-600/50 hover:text-red-400" 
                         title="Supprimer"
                         disabled={frames.length <= 1}
@@ -154,6 +167,7 @@ export const Timeline: React.FC = () => {
                         onDrop={(e) => handleDrop(e, index)}
                         onDragEnd={handleDragEnd}
                         onClick={() => setCurrentFrameIndex(index)}
+                        onContextMenu={(e) => handleContextMenu(e, index)}
                         className={`
                             flex-shrink-0 rounded-lg border-2 cursor-pointer select-none
                             transition-all duration-75
@@ -173,7 +187,7 @@ export const Timeline: React.FC = () => {
                         
                         {/* Mini preview */}
                         <div 
-                            className="mx-auto grid gap-[1px] bg-black rounded p-1"
+                            className="mx-auto grid gap-[0.5px] bg-black rounded p-0.5"
                             style={{ 
                                 gridTemplateColumns: 'repeat(16, 1fr)',
                                 width: 56,
@@ -185,7 +199,7 @@ export const Timeline: React.FC = () => {
                                     <div
                                         key={`${r}-${c}`}
                                         className={pixel ? 'bg-[#00ff41]' : 'bg-[#1a1a1a]'}
-                                        style={{ width: 3, height: 3 }}
+                                        style={{ width: '100%', height: '100%' }}
                                     />
                                 ))
                             )}
@@ -198,6 +212,30 @@ export const Timeline: React.FC = () => {
                     </div>
                 ))}
             </div>
+
+            {/* Context Menu */}
+            {contextMenu && (
+                <div
+                    className="fixed z-50 bg-[#1a1a1a] border border-[#333] rounded shadow-xl py-1 min-w-[150px]"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                >
+                    <button
+                        className="w-full text-left px-4 py-2 hover:bg-[#333] text-sm flex items-center gap-2 text-gray-200"
+                        onClick={() => duplicateFrame(contextMenu.index)}
+                    >
+                        <Copy size={14} />
+                        <span>Dupliquer</span>
+                    </button>
+                    <button
+                        className="w-full text-left px-4 py-2 hover:bg-red-900/30 text-red-400 text-sm flex items-center gap-2"
+                        onClick={() => deleteFrame(contextMenu.index)}
+                        disabled={frames.length <= 1}
+                    >
+                        <Trash2 size={14} />
+                        <span>Supprimer</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

@@ -6,6 +6,8 @@ import { v4 as uuidv4 } from 'uuid';
 // Shape types
 export type ShapeType = 'circle' | 'square' | 'diamond' | 'cross' | 'heart' | 'arrow_up' | 'arrow_down' | 'checker';
 
+export type ToolType = 'brush' | 'eraser' | ShapeType;
+
 // Project structure
 export interface Project {
     id: string;
@@ -27,23 +29,34 @@ interface AppState {
     // Runtime state
     currentFrameIndex: number;
     isPlaying: boolean;
-    selectedTool: 'brush' | 'eraser';
+    selectedTool: ToolType;
     blinkFrequency: number;
     timelineHeight: number;
+    
+    // History
+    history: Project[];
+    historyIndex: number;
+    toastMessage: string | null;
 
     // Project Actions
     createNewProject: (name: string) => void;
-    saveCurrentProject: () => void;
+    saveCurrentProject: (showToast?: boolean) => void;
     loadProject: (projectId: string) => void;
     deleteProject: (projectId: string) => void;
     renameProject: (name: string) => void;
     exportProjectAsJson: () => string;
     importProjectFromJson: (json: string) => boolean;
+    
+    // History Actions
+    undo: () => void;
+    redo: () => void;
+    pushToHistory: () => void;
+    clearToast: () => void;
 
     // Frame Actions
     addFrame: () => void;
-    duplicateFrame: () => void;
-    deleteFrame: () => void;
+    duplicateFrame: (index?: number) => void;
+    deleteFrame: (index?: number) => void;
     setCurrentFrameIndex: (index: number) => void;
     updateGrid: (grid: Matrix16x16) => void;
     moveFrame: (fromIndex: number, toIndex: number) => void;
@@ -65,7 +78,7 @@ interface AppState {
     updateExportConfig: (config: Partial<ExportConfig>) => void;
 
     // Tools
-    setSelectedTool: (tool: 'brush' | 'eraser') => void;
+    setSelectedTool: (tool: ToolType) => void;
     
     // UI
     setTimelineHeight: (height: number) => void;
@@ -78,7 +91,7 @@ const createFilledGrid = (): Matrix16x16 =>
     Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(1)) as Matrix16x16;
 
 // Shape generators
-const generateShape = (shape: string): Matrix16x16 => {
+export const generateShape = (shape: string): Matrix16x16 => {
     const grid = createEmptyGrid();
     const cx = 7.5, cy = 7.5;
     
@@ -184,6 +197,9 @@ export const useStore = create<AppState>()(
             selectedTool: 'brush',
             blinkFrequency: 0,
             timelineHeight: 180,
+            history: [],
+            historyIndex: -1,
+            toastMessage: null,
 
             // === PROJECT ACTIONS ===
             createNewProject: (name) => {
@@ -193,19 +209,25 @@ export const useStore = create<AppState>()(
                     currentFrameIndex: 0,
                     isPlaying: false,
                     recentProjects: [project, ...state.recentProjects.filter(p => p.id !== project.id)].slice(0, 10),
+                    history: [project],
+                    historyIndex: 0,
                 }));
             },
 
-            saveCurrentProject: () => {
-                const { currentProject, recentProjects } = get();
-                if (!currentProject) return;
-                
-                const updated = { ...currentProject, updatedAt: Date.now() };
-                set({
-                    currentProject: updated,
-                    recentProjects: [updated, ...recentProjects.filter(p => p.id !== updated.id)].slice(0, 10),
-                });
-            },
+    saveCurrentProject: (showToast = true) => {
+        const { currentProject, recentProjects } = get();
+        if (!currentProject) return;
+        
+        const updated = { ...currentProject, updatedAt: Date.now() };
+        set({
+            currentProject: updated,
+            recentProjects: [updated, ...recentProjects.filter(p => p.id !== updated.id)].slice(0, 10),
+            ...(showToast ? { toastMessage: 'Projet sauvegardé !' } : {})
+        });
+        if (showToast) {
+            setTimeout(() => set({ toastMessage: null }), 2000);
+        }
+    },
 
             loadProject: (projectId) => {
                 const { recentProjects } = get();
@@ -215,6 +237,8 @@ export const useStore = create<AppState>()(
                         currentProject: { ...project },
                         currentFrameIndex: 0,
                         isPlaying: false,
+                        history: [project],
+                        historyIndex: 0,
                     });
                 }
             },
@@ -261,6 +285,8 @@ export const useStore = create<AppState>()(
                             currentFrameIndex: 0,
                             isPlaying: false,
                             recentProjects: [project, ...state.recentProjects.filter(p => p.id !== project.id)].slice(0, 10),
+                            history: [project],
+                            historyIndex: 0,
                         }));
                         return true;
                     }
@@ -270,165 +296,256 @@ export const useStore = create<AppState>()(
                 return false;
             },
 
+            // === HISTORY ACTIONS ===
+            pushToHistory: () => {
+                const { currentProject, history, historyIndex } = get();
+                if (!currentProject) return;
+                
+                const newHistory = history.slice(0, historyIndex + 1);
+                newHistory.push(currentProject);
+                
+                // Limit history size
+                if (newHistory.length > 20) newHistory.shift();
+                
+                set({
+                    history: newHistory,
+                    historyIndex: newHistory.length - 1
+                });
+            },
+
+            undo: () => {
+                const { history, historyIndex } = get();
+                if (historyIndex > 0) {
+                    const prevProject = history[historyIndex - 1];
+                    set({
+                        currentProject: prevProject,
+                        historyIndex: historyIndex - 1,
+                        // Ensure frame index is valid
+                        currentFrameIndex: Math.min(get().currentFrameIndex, prevProject.frames.length - 1)
+                    });
+                }
+            },
+
+            redo: () => {
+                const { history, historyIndex } = get();
+                if (historyIndex < history.length - 1) {
+                    const nextProject = history[historyIndex + 1];
+                    set({
+                        currentProject: nextProject,
+                        historyIndex: historyIndex + 1,
+                        currentFrameIndex: Math.min(get().currentFrameIndex, nextProject.frames.length - 1)
+                    });
+                }
+            },
+
+            clearToast: () => set({ toastMessage: null }),
+
             // === FRAME ACTIONS ===
-            addFrame: () => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrame = { id: uuidv4(), grid: createEmptyGrid(), duration: state.currentProject.playbackSpeed };
-                const newFrames = [...state.currentProject.frames, newFrame];
-                return {
-                    currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
-                    currentFrameIndex: newFrames.length - 1,
-                };
-            }),
+            addFrame: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const newFrame = { id: uuidv4(), grid: createEmptyGrid(), duration: state.currentProject.playbackSpeed };
+                    const newFrames = [...state.currentProject.frames, newFrame];
+                    return {
+                        currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
+                        currentFrameIndex: newFrames.length - 1,
+                    };
+                });
+            },
 
-            duplicateFrame: () => set((state) => {
-                if (!state.currentProject) return state;
-                const currentFrame = state.currentProject.frames[state.currentFrameIndex];
-                const newGrid = currentFrame.grid.map(row => [...row]) as Matrix16x16;
-                const newFrame = { id: uuidv4(), grid: newGrid, duration: currentFrame.duration };
-                const newFrames = [...state.currentProject.frames];
-                newFrames.splice(state.currentFrameIndex + 1, 0, newFrame);
-                return {
-                    currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
-                    currentFrameIndex: state.currentFrameIndex + 1,
-                };
-            }),
+            duplicateFrame: (index?: number) => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const targetIndex = index ?? state.currentFrameIndex;
+                    const currentFrame = state.currentProject.frames[targetIndex];
+                    const newGrid = currentFrame.grid.map(row => [...row]) as Matrix16x16;
+                    const newFrame = { id: uuidv4(), grid: newGrid, duration: currentFrame.duration };
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames.splice(targetIndex + 1, 0, newFrame);
+                    return {
+                        currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
+                        currentFrameIndex: targetIndex + 1,
+                    };
+                });
+            },
 
-            deleteFrame: () => set((state) => {
-                if (!state.currentProject || state.currentProject.frames.length <= 1) return state;
-                const newFrames = state.currentProject.frames.filter((_, i) => i !== state.currentFrameIndex);
-                const newIndex = Math.min(state.currentFrameIndex, newFrames.length - 1);
-                return {
-                    currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
-                    currentFrameIndex: newIndex,
-                };
-            }),
+            deleteFrame: (index?: number) => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject || state.currentProject.frames.length <= 1) return state;
+                    const targetIndex = index ?? state.currentFrameIndex;
+                    const newFrames = state.currentProject.frames.filter((_, i) => i !== targetIndex);
+                    
+                    let newIndex = state.currentFrameIndex;
+                    if (targetIndex === state.currentFrameIndex) {
+                         newIndex = Math.min(state.currentFrameIndex, newFrames.length - 1);
+                    } else if (targetIndex < state.currentFrameIndex) {
+                        newIndex = state.currentFrameIndex - 1;
+                    }
+
+                    return {
+                        currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
+                        currentFrameIndex: newIndex,
+                    };
+                });
+            },
 
             setCurrentFrameIndex: (index) => set({ currentFrameIndex: index }),
 
-            updateGrid: (grid) => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid };
-                return {
-                    currentProject: { ...state.currentProject, frames: newFrames },
-                };
-            }),
+            updateGrid: (grid) => {
+                // Don't push to history on every pixel change, maybe debounce?
+                // For now, we'll push on mouse up in the component, but here we just update state
+                // Actually, let's push history BEFORE update if it's a new "stroke"
+                // But since updateGrid is called continuously, we rely on the component to call pushToHistory
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid };
+                    return {
+                        currentProject: { ...state.currentProject, frames: newFrames },
+                    };
+                });
+            },
 
-            moveFrame: (fromIndex, toIndex) => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrames = [...state.currentProject.frames];
-                const [movedFrame] = newFrames.splice(fromIndex, 1);
-                newFrames.splice(toIndex, 0, movedFrame);
-                
-                let newCurrentIndex = state.currentFrameIndex;
-                if (state.currentFrameIndex === fromIndex) {
-                    newCurrentIndex = toIndex;
-                } else if (state.currentFrameIndex > fromIndex && state.currentFrameIndex <= toIndex) {
-                    newCurrentIndex--;
-                } else if (state.currentFrameIndex < fromIndex && state.currentFrameIndex >= toIndex) {
-                    newCurrentIndex++;
-                }
-                
-                return {
-                    currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
-                    currentFrameIndex: newCurrentIndex,
-                };
-            }),
+            moveFrame: (fromIndex, toIndex) => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const newFrames = [...state.currentProject.frames];
+                    const [movedFrame] = newFrames.splice(fromIndex, 1);
+                    newFrames.splice(toIndex, 0, movedFrame);
+                    
+                    let newCurrentIndex = state.currentFrameIndex;
+                    if (state.currentFrameIndex === fromIndex) {
+                        newCurrentIndex = toIndex;
+                    } else if (state.currentFrameIndex > fromIndex && state.currentFrameIndex <= toIndex) {
+                        newCurrentIndex--;
+                    } else if (state.currentFrameIndex < fromIndex && state.currentFrameIndex >= toIndex) {
+                        newCurrentIndex++;
+                    }
+                    
+                    return {
+                        currentProject: { ...state.currentProject, frames: newFrames, updatedAt: Date.now() },
+                        currentFrameIndex: newCurrentIndex,
+                    };
+                });
+            },
 
-            clearCurrentFrame: () => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: createEmptyGrid() };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            clearCurrentFrame: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: createEmptyGrid() };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            fillCurrentFrame: () => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: createFilledGrid() };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            fillCurrentFrame: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: createFilledGrid() };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            invertCurrentFrame: () => set((state) => {
-                if (!state.currentProject) return state;
-                const currentGrid = state.currentProject.frames[state.currentFrameIndex].grid;
-                const invertedGrid = currentGrid.map(row => row.map(p => (p ? 0 : 1))) as Matrix16x16;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: invertedGrid };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            invertCurrentFrame: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const currentGrid = state.currentProject.frames[state.currentFrameIndex].grid;
+                    const invertedGrid = currentGrid.map(row => row.map(p => (p ? 0 : 1))) as Matrix16x16;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: invertedGrid };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            applyShape: (shape) => set((state) => {
-                if (!state.currentProject) return state;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: generateShape(shape) };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            applyShape: (shape) => {
+                // This is now just setting the tool, not applying immediately
+                // But for compatibility if called directly:
+                get().setSelectedTool(shape);
+            },
 
-            shiftFrame: (direction) => set((state) => {
-                if (!state.currentProject) return state;
-                const grid = state.currentProject.frames[state.currentFrameIndex].grid;
-                const newGrid = createEmptyGrid();
-                
-                const shifts: Record<string, [number, number]> = {
-                    up: [0, -1],
-                    down: [0, 1],
-                    left: [-1, 0],
-                    right: [1, 0],
-                };
-                const [dx, dy] = shifts[direction] || [0, 0];
-                
-                for (let r = 0; r < GRID_SIZE; r++) {
-                    for (let c = 0; c < GRID_SIZE; c++) {
-                        const srcR = r - dy, srcC = c - dx;
-                        if (srcR >= 0 && srcR < GRID_SIZE && srcC >= 0 && srcC < GRID_SIZE) {
+            shiftFrame: (direction) => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const grid = state.currentProject.frames[state.currentFrameIndex].grid;
+                    const newGrid = createEmptyGrid();
+                    
+                    const shifts: Record<string, [number, number]> = {
+                        up: [0, -1],
+                        down: [0, 1],
+                        left: [-1, 0],
+                        right: [1, 0],
+                    };
+                    const [dx, dy] = shifts[direction] || [0, 0];
+                    
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        for (let c = 0; c < GRID_SIZE; c++) {
+                            // Cyclic shift (Wrap around)
+                            const srcR = (r - dy + GRID_SIZE) % GRID_SIZE;
+                            const srcC = (c - dx + GRID_SIZE) % GRID_SIZE;
                             newGrid[r][c] = grid[srcR][srcC];
                         }
                     }
-                }
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            rotateFrame: (direction) => set((state) => {
-                if (!state.currentProject) return state;
-                const grid = state.currentProject.frames[state.currentFrameIndex].grid;
-                const newGrid = createEmptyGrid();
-                const clockwise = direction === 'cw';
-                
-                for (let r = 0; r < GRID_SIZE; r++) {
-                    for (let c = 0; c < GRID_SIZE; c++) {
-                        if (clockwise) {
-                            newGrid[c][GRID_SIZE - 1 - r] = grid[r][c];
-                        } else {
-                            newGrid[GRID_SIZE - 1 - c][r] = grid[r][c];
+            rotateFrame: (direction) => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const grid = state.currentProject.frames[state.currentFrameIndex].grid;
+                    const newGrid = createEmptyGrid();
+                    const clockwise = direction === 'cw';
+                    
+                    for (let r = 0; r < GRID_SIZE; r++) {
+                        for (let c = 0; c < GRID_SIZE; c++) {
+                            if (clockwise) {
+                                newGrid[c][GRID_SIZE - 1 - r] = grid[r][c];
+                            } else {
+                                newGrid[GRID_SIZE - 1 - c][r] = grid[r][c];
+                            }
                         }
                     }
-                }
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            flipFrameHorizontal: () => set((state) => {
-                if (!state.currentProject) return state;
-                const grid = state.currentProject.frames[state.currentFrameIndex].grid;
-                const newGrid = grid.map(row => [...row].reverse()) as Matrix16x16;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            flipFrameHorizontal: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const grid = state.currentProject.frames[state.currentFrameIndex].grid;
+                    const newGrid = grid.map(row => [...row].reverse()) as Matrix16x16;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
-            flipFrameVertical: () => set((state) => {
-                if (!state.currentProject) return state;
-                const grid = state.currentProject.frames[state.currentFrameIndex].grid;
-                const newGrid = [...grid].reverse().map(row => [...row]) as Matrix16x16;
-                const newFrames = [...state.currentProject.frames];
-                newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
-                return { currentProject: { ...state.currentProject, frames: newFrames } };
-            }),
+            flipFrameVertical: () => {
+                get().pushToHistory();
+                set((state) => {
+                    if (!state.currentProject) return state;
+                    const grid = state.currentProject.frames[state.currentFrameIndex].grid;
+                    const newGrid = [...grid].reverse().map(row => [...row]) as Matrix16x16;
+                    const newFrames = [...state.currentProject.frames];
+                    newFrames[state.currentFrameIndex] = { ...newFrames[state.currentFrameIndex], grid: newGrid };
+                    return { currentProject: { ...state.currentProject, frames: newFrames } };
+                });
+            },
 
             // === PLAYBACK ===
             togglePlayback: () => set((state) => ({ isPlaying: !state.isPlaying })),

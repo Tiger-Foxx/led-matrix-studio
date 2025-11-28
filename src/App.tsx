@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { 
     Download, Save, FolderOpen, Plus, FileJson, Upload, X, 
-    Trash2, Clock, Edit3, Check
+    Trash2, Clock, Edit3, Check, Undo, Redo
 } from 'lucide-react';
+import logo from './assets/logo.png';
 import { MatrixGrid } from './components/MatrixGrid';
 import { Timeline } from './components/Timeline';
 import { ControlPanel } from './components/ControlPanel';
@@ -25,6 +26,9 @@ function App() {
         renameProject,
         exportProjectAsJson,
         importProjectFromJson,
+        undo,
+        redo,
+        toastMessage
     } = useStore();
 
     const [showExport, setShowExport] = useState(false);
@@ -36,6 +40,31 @@ function App() {
 
     const frames = currentProject?.frames ?? [];
     const playbackSpeed = currentProject?.playbackSpeed ?? 200;
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key.toLowerCase()) {
+                    case 'z':
+                        e.preventDefault();
+                        undo();
+                        break;
+                    case 'y':
+                        e.preventDefault();
+                        redo();
+                        break;
+                    case 's':
+                        e.preventDefault();
+                        saveCurrentProject();
+                        break;
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [undo, redo, saveCurrentProject]);
 
     // Animation Loop
     useEffect(() => {
@@ -49,13 +78,13 @@ function App() {
         return () => clearInterval(interval);
     }, [isPlaying, currentFrameIndex, frames.length, playbackSpeed, setCurrentFrameIndex]);
 
-    // Auto-save every 3 seconds
+    // Auto-save every 60 seconds
     useEffect(() => {
         if (currentProject) {
-            const timer = setTimeout(() => {
-                saveCurrentProject();
-            }, 3000);
-            return () => clearTimeout(timer);
+            const timer = setInterval(() => {
+                saveCurrentProject(false);
+            }, 60000);
+            return () => clearInterval(timer);
         }
     }, [currentProject, saveCurrentProject]);
 
@@ -108,11 +137,18 @@ function App() {
     // Welcome / Recent Projects Screen
     if (!currentProject || showRecentProjects) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-8">
+            <div className="min-h-screen flex items-center justify-center p-8 relative bg-[#0a0a0a]">
+                {/* Toast */}
+                {toastMessage && (
+                    <div className="fixed top-4 right-4 bg-[#00ff41] text-black px-4 py-2 rounded shadow-lg z-50 animate-fade-in-down font-bold">
+                        {toastMessage}
+                    </div>
+                )}
+                
                 <div className="max-w-2xl w-full">
                     <div className="text-center mb-8">
                         <h1 className="text-4xl font-bold text-white mb-2 flex items-center justify-center gap-3">
-                            <span className="w-4 h-4 rounded-full bg-[#00ff41] shadow-[0_0_15px_#00ff41]"></span>
+                            <img src={logo} alt="Logo" className="w-12 h-12" />
                             LED Matrix Studio
                         </h1>
                         <p className="text-gray-500">Éditeur d'animations pour matrice LED 16×16</p>
@@ -158,7 +194,7 @@ function App() {
                         />
                         <button 
                             onClick={() => fileInputRef.current?.click()}
-                            className="btn w-full"
+                            className="btn w-full flex items-center justify-center gap-2"
                         >
                             <FileJson size={16} />
                             Charger un fichier JSON
@@ -227,12 +263,20 @@ function App() {
     }
 
     return (
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="h-screen flex flex-col overflow-hidden relative">
+            {/* Toast */}
+            {toastMessage && (
+                <div className="fixed top-4 right-4 bg-[#00ff41] text-black px-4 py-2 rounded shadow-lg z-50 animate-fade-in-down font-bold flex items-center gap-2">
+                    <Check size={16} />
+                    {toastMessage}
+                </div>
+            )}
+
             {/* Header */}
             <header className="flex items-center justify-between px-4 py-3 border-b border-[#333] bg-[#111] flex-shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#00ff41] shadow-[0_0_8px_#00ff41]"></span>
+                        <img src={logo} alt="Logo" className="w-8 h-8" />
                         <span className="font-bold text-white">LED Matrix Studio</span>
                     </div>
                     
@@ -271,6 +315,13 @@ function App() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <button onClick={undo} className="btn" title="Annuler (Ctrl+Z)">
+                        <Undo size={16} />
+                    </button>
+                    <button onClick={redo} className="btn" title="Rétablir (Ctrl+Y)">
+                        <Redo size={16} />
+                    </button>
+                    <div className="w-px h-5 bg-[#333] mx-1"></div>
                     <button 
                         onClick={() => setShowRecentProjects(true)} 
                         className="btn" 
@@ -279,9 +330,9 @@ function App() {
                         <FolderOpen size={16} />
                     </button>
                     <button 
-                        onClick={saveCurrentProject} 
+                        onClick={() => saveCurrentProject()} 
                         className="btn" 
-                        title="Sauvegarder"
+                        title="Sauvegarder (Ctrl+S)"
                     >
                         <Save size={16} />
                     </button>

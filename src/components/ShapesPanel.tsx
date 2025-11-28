@@ -28,7 +28,8 @@ export function ShapesPanel() {
         invertCurrentFrame,
         fillCurrentFrame,
         currentProject,
-        currentFrameIndex
+        currentFrameIndex,
+        selectedTool
     } = useStore();
 
     const hasFrame = currentProject && currentProject.frames.length > 0;
@@ -39,14 +40,18 @@ export function ShapesPanel() {
             <div className="p-4 border-b border-[#333]">
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                     <Sparkles size={14} />
-                    Formes
+                    Formes (Pinceau)
                 </h3>
                 <div className="grid grid-cols-4 gap-1.5">
                     {SHAPES.map(({ type, icon, label }) => (
                         <button
                             key={type}
                             onClick={() => applyShape(type)}
-                            className="p-2.5 bg-[#1a1a1a] hover:bg-[#252525] border border-[#333] hover:border-[#00ff41] rounded text-gray-300 hover:text-[#00ff41] transition-colors"
+                            className={`p-2.5 border rounded transition-all ${
+                                selectedTool === type 
+                                    ? 'bg-[#00ff41]/20 border-[#00ff41] text-[#00ff41] shadow-[0_0_10px_rgba(0,255,65,0.2)]' 
+                                    : 'bg-[#1a1a1a] border-[#333] text-gray-400 hover:border-[#555] hover:text-white'
+                            }`}
                             title={label}
                             disabled={!hasFrame}
                         >
