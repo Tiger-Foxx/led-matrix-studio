@@ -1,17 +1,36 @@
 import { saveAs } from 'file-saver';
 import JSZip from 'jszip';
-import type { ExportConfig, Frame, Matrix16x16, PixelState } from './types';
+import type { ExportConfig, Frame, Matrix16x16 } from './types';
 
+/**
+ * Binary Export - Reproduit EXACTEMENT la logique du code Python de preuve de concept
+ * 
+ * Le code Python fait :
+ * 1. Lecture des lignes (avec option flip_y qui inverse l'ordre des lignes dans le bloc 8x8)
+ * 2. Lecture des pixels par ligne (avec option flip_x qui inverse l'ordre des colonnes)
+ * 3. Rotation circulaire des lignes (offset_val avec deque.rotate)
+ * 4. Inversion de polarité (si inv_pol: 0 devient 1, 1 devient 0)
+ * 5. Encodage en octet (avec bit_rev qui inverse l'ordre des bits)
+ */
 
-
-// Helper to rotate an array (circular shift)
+/**
+ * Rotation circulaire d'un tableau (équivalent à deque.rotate en Python)
+ * Python: deque.rotate(n) - rotation vers la droite si n > 0
+ */
 const rotateArray = <T>(arr: T[], offset: number): T[] => {
+    if (arr.length === 0) return arr;
     const len = arr.length;
-    const n = ((offset % len) + len) % len; // Normalize offset
+    // Normaliser l'offset pour qu'il soit positif et dans les limites
+    const n = ((offset % len) + len) % len;
+    if (n === 0) return [...arr];
+    // Python's deque.rotate(n) moves n elements from the right to the left
+    // rotate(1): [1,2,3,4] -> [4,1,2,3]
     return [...arr.slice(len - n), ...arr.slice(0, len - n)];
 };
 
-// Helper to process an 8x8 block
+/**
+ * Traite un bloc 8x8 - EXACTEMENT comme la fonction Python process_8x8_block
+ */
 const process8x8Block = (
     grid: Matrix16x16,
     startRow: number,
@@ -21,61 +40,78 @@ const process8x8Block = (
     const { bitReversal, flipX, flipY, invertOutput, offsetY } = config;
     const blockBytes: number[] = [];
 
-    // 1. Extract raw rows (handling Flip Y)
-    // If Flip Y is true, we read rows from bottom to top within the block
-    const rowsRange = flipY
-        ? Array.from({ length: 8 }, (_, i) => startRow + 7 - i)
-        : Array.from({ length: 8 }, (_, i) => startRow + i);
+    /* Python:
+        def process_8x8_block(start_row, start_col):
+            block_bytes = []
+            # Lecture brute (gestion Flip Y incluse ici)
+            rows_range = range(start_row + 7, start_row - 1, -1) if flip_y else range(start_row, start_row + 8)
+            
+            raw_rows = []
+            for r in rows_range:
+                row_pixels = frame[r][start_col : start_col + 8]
+                if flip_x: row_pixels = row_pixels[::-1]
+                raw_rows.append(row_pixels)
+    */
 
-    let rawRows: PixelState[][] = [];
-    for (const r of rowsRange) {
-        let rowPixels = grid[r].slice(startCol, startCol + 8);
-        // Handle Flip X
-        if (flipX) {
-            rowPixels = rowPixels.reverse();
+    // 1. Lecture des lignes (avec gestion Flip Y)
+    // Si flipY: on lit de start_row+7 à start_row (inversé)
+    // Sinon: on lit de start_row à start_row+7 (normal)
+    const rawRows: number[][] = [];
+    
+    if (flipY) {
+        // range(start_row + 7, start_row - 1, -1) -> [start_row+7, start_row+6, ..., start_row]
+        for (let r = startRow + 7; r >= startRow; r--) {
+            let rowPixels = grid[r].slice(startCol, startCol + 8);
+            if (flipX) {
+                rowPixels = [...rowPixels].reverse();
+            }
+            rawRows.push([...rowPixels]);
         }
-        rawRows.push(rowPixels);
+    } else {
+        // range(start_row, start_row + 8) -> [start_row, start_row+1, ..., start_row+7]
+        for (let r = startRow; r < startRow + 8; r++) {
+            let rowPixels = grid[r].slice(startCol, startCol + 8);
+            if (flipX) {
+                rowPixels = [...rowPixels].reverse();
+            }
+            rawRows.push([...rowPixels]);
+        }
     }
 
-    // 2. Apply Offset Y (Circular Shift)
-    // In Python: deque.rotate(offset_val) -> positive moves right (or down in this context of rows)
-    // We need to verify the direction. Python's deque.rotate(1) moves the last element to the front.
-    // Our rotateArray implementation does the same.
+    /* Python:
+        # Correction Offset (Décalage Circulaire)
+        dq_rows = deque(raw_rows)
+        dq_rows.rotate(offset_val)
+        shifted_rows = list(dq_rows)
+    */
+    
+    // 2. Application de l'offset (décalage circulaire vertical)
     const shiftedRows = rotateArray(rawRows, offsetY);
 
-    // 3. Encode to Byte
+    /* Python:
+        # Encodage Byte
+        for row_pixels in shifted_rows:
+            if inv_pol: row_pixels = [0 if p else 1 for p in row_pixels]
+            byte_val = 0
+            for i, pixel in enumerate(row_pixels):
+                if pixel:
+                    shift = (7 - i) if bit_rev else i
+                    byte_val |= (1 << shift)
+            block_bytes.append(byte_val)
+    */
+
+    // 3. Encodage en octets
     for (const rowPixels of shiftedRows) {
-        let byteVal = 0;
-        // Apply Invert Output (Active Low vs High)
-        // If invertOutput is true: 1 (ON) becomes 0, 0 (OFF) becomes 1.
-        // BUT WAIT: The Python code says:
-        // if inv_pol: row_pixels = [0 if p else 1 for p in row_pixels]
-        // So if pixel is ON (1), it becomes 0. If OFF (0), it becomes 1.
-        // Then it iterates: if pixel (which is now inverted) is true...
-        // This seems slightly counter-intuitive in the Python loop, let's re-read Python carefully.
-
-        /* Python:
-           if inv_pol: row_pixels = [0 if p else 1 for p in row_pixels]
-           byte_val = 0
-           for i, pixel in enumerate(row_pixels):
-               if pixel: ...
-        */
-        // So if inv_pol is true, and we have an ON pixel (1), it becomes 0. The loop sees 0 and does nothing.
-        // So ON pixels result in 0 bits. OFF pixels result in 1 bits.
-        // This matches "Active Low" (0 = ON).
-
+        // Inversion de polarité si nécessaire
         const finalPixels = invertOutput
             ? rowPixels.map(p => (p ? 0 : 1))
             : rowPixels;
 
+        let byteVal = 0;
         for (let i = 0; i < 8; i++) {
             if (finalPixels[i]) {
-                // Bit Reversal: D0 <-> D7
-                // If bitReversal is true, index 0 maps to bit 7 (1 << 7)
-                // If false, index 0 maps to bit 0 (1 << 0) -- WAIT, usually index 0 is MSB or LSB?
-                // Python: shift = (7 - i) if bit_rev else i
-                // If bit_rev is True: i=0 -> shift=7. i=7 -> shift=0.
-                // If bit_rev is False: i=0 -> shift=0. i=7 -> shift=7.
+                // bit_rev: si True, i=0 -> bit 7, i=7 -> bit 0
+                // si False, i=0 -> bit 0, i=7 -> bit 7
                 const shift = bitReversal ? (7 - i) : i;
                 byteVal |= (1 << shift);
             }
@@ -86,41 +122,71 @@ const process8x8Block = (
     return blockBytes;
 };
 
-export const generateBinaryFiles = async (frames: Frame[], config: ExportConfig) => {
+/**
+ * Génère les fichiers binaires pour les 4 EEPROMs
+ * @param frames - Les frames du projet
+ * @param config - La configuration d'export
+ * @param projectName - Le nom du projet (pour préfixer les fichiers)
+ */
+export const generateBinaryFiles = async (
+    frames: Frame[], 
+    config: ExportConfig,
+    projectName: string = 'matrix_project'
+): Promise<void> => {
     if (frames.length === 0) return;
 
     const { loopSize } = config;
     const targetLoopSize = loopSize > 0 ? loopSize : 64;
 
-    // 1. Prepare Buffers
+    /* Python:
+        # Création de la séquence finale répétée
+        final_sequence = []
+        user_frames_count = len(self.frames)
+        
+        for i in range(target_loop_size):
+            frame_to_use = self.frames[i % user_frames_count]
+            final_sequence.append(frame_to_use)
+    */
+
+    // Préparer les buffers pour chaque EEPROM
     const dataTL: number[] = [];
     const dataTR: number[] = [];
     const dataBL: number[] = [];
     const dataBR: number[] = [];
 
-    // 2. Loop Filling (Pattern Repeating)
+    // Génération avec bouclage (Pattern Repeating)
     for (let i = 0; i < targetLoopSize; i++) {
         const frame = frames[i % frames.length];
         const grid = frame.grid;
 
-        // TL: 0,0
+        /* Python:
+            data_TL.extend(process_8x8_block(0, 0))
+            data_TR.extend(process_8x8_block(0, 8))
+            data_BL.extend(process_8x8_block(8, 0))
+            data_BR.extend(process_8x8_block(8, 8))
+        */
+
+        // TL (Top-Left): lignes 0-7, colonnes 0-7
         dataTL.push(...process8x8Block(grid, 0, 0, config));
-        // TR: 0,8
+        // TR (Top-Right): lignes 0-7, colonnes 8-15
         dataTR.push(...process8x8Block(grid, 0, 8, config));
-        // BL: 8,0
+        // BL (Bottom-Left): lignes 8-15, colonnes 0-7
         dataBL.push(...process8x8Block(grid, 8, 0, config));
-        // BR: 8,8
+        // BR (Bottom-Right): lignes 8-15, colonnes 8-15
         dataBR.push(...process8x8Block(grid, 8, 8, config));
     }
 
-    // 3. Create Zip
-    const zip = new JSZip();
-    zip.file("eeprom_TL.bin", new Uint8Array(dataTL));
-    zip.file("eeprom_TR.bin", new Uint8Array(dataTR));
-    zip.file("eeprom_BL.bin", new Uint8Array(dataBL));
-    zip.file("eeprom_BR.bin", new Uint8Array(dataBR));
+    // Nettoyer le nom du projet pour les noms de fichiers
+    const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
 
-    // 4. Download
-    const content = await zip.generateAsync({ type: "blob" });
-    saveAs(content, "matrix_project_binaries.zip");
+    // Créer le ZIP avec les fichiers binaires préfixés du nom du projet
+    const zip = new JSZip();
+    zip.file(`${safeName}_TL.bin`, new Uint8Array(dataTL));
+    zip.file(`${safeName}_TR.bin`, new Uint8Array(dataTR));
+    zip.file(`${safeName}_BL.bin`, new Uint8Array(dataBL));
+    zip.file(`${safeName}_BR.bin`, new Uint8Array(dataBR));
+
+    // Télécharger le ZIP
+    const content = await zip.generateAsync({ type: 'blob' });
+    saveAs(content, `${safeName}_binaries.zip`);
 };

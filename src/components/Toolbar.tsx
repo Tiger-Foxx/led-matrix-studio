@@ -41,11 +41,11 @@ const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 export const Toolbar: React.FC = () => {
     const {
-        frames, currentFrameIndex, updateGrid,
+        currentProject, currentFrameIndex, updateGrid,
         selectedTool, setSelectedTool
     } = useStore();
 
-    const currentGrid = frames[currentFrameIndex]?.grid;
+    const currentGrid = currentProject?.frames[currentFrameIndex]?.grid;
 
     if (!currentGrid) return null;
 

@@ -12,10 +12,10 @@ export const ExportPanel: React.FC<ExportPanelProps> = ({ onClose }) => {
     
     if (!currentProject) return null;
     
-    const { exportConfig, frames } = currentProject;
+    const { exportConfig, frames, name } = currentProject;
 
     const handleExport = async () => {
-        await generateBinaryFiles(frames, exportConfig);
+        await generateBinaryFiles(frames, exportConfig, name);
         onClose?.();
     };
 
